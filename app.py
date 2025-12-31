@@ -8,110 +8,9 @@ from dash.dependencies import Input, Output, State
 import plotly.express as px
 from PIL import Image
 import base64
-
-class ProjectileOptimizer:
-    def __init__(self):
-        self.g = 9.81
-        self.mass = 0.27
-        self.Cd = 0.48
-        self.rho = 1.225
-        self.A = 0.0346
-        
-    # def equations_of_motion(self, state, t):
-    #     x, y, vx, vy = state
-    #     v = np.sqrt(vx**2 + vy**2)
-    #     Fd = -0.5 * self.Cd * self.rho * self.A * v
-        
-    #     ax = (Fd * vx / self.mass) if v > 0 else 0
-    #     ay = (Fd * vy / self.mass) if v > 0 else 0
-    #     ay -= self.g
-        
-    #     return [vx, vy, ax, ay]
-    
-    def drag_force(self, velocity):
-        """Calculate drag force using F = 1/2 * ρ * v² * Cd * A"""
-        velocity_magnitude = np.linalg.norm(velocity)
-        if velocity_magnitude == 0:
-            return np.zeros_like(velocity)
-        
-        drag_magnitude = (0.5 * self.rho * velocity_magnitude**2 * 
-                         self.Cd * self.A)
-        
-        # Drag force acts in opposite direction of velocity
-        return -drag_magnitude * velocity / velocity_magnitude
-
-    def derivatives(self, state, t):
-        """Calculate derivatives for position and velocity"""
-        # state = [x, y, vx, vy]
-        vx, vy = state[2], state[3]
-        velocity = np.array([vx, vy])
-        
-        # Calculate drag force
-        drag_force = self.drag_force(velocity)
-        
-        # Acceleration components (F = ma)
-        ax = drag_force[0] / self.mass
-        ay = drag_force[1] / self.mass - self.g
-        
-        return [vx, vy, ax, ay]
-
-    # def simulate(self, initial_velocity, angle_degrees, time_span, dt=0.01):
-    #     """
-    #     Simulate projectile motion
-        
-    #     Parameters:
-    #     - initial_velocity: speed in m/s
-    #     - angle_degrees: launch angle in degrees
-    #     - time_span: simulation duration in seconds
-    #     - dt: time step in seconds
-    #     """
-    #     # Convert angle to radians
-    #     angle = np.deg2rad(angle_degrees)
-        
-    #     # Initial conditions [x, y, vx, vy]
-    #     initial_state = [0, 0,
-    #                     initial_velocity * np.cos(angle),
-    #                     initial_velocity * np.sin(angle)]
-        
-    #     # Time points
-    #     t = np.arange(0, time_span, dt)
-        
-    #     # Solve ODE
-    #     solution = odeint(self.derivatives, initial_state, t)
-        
-    #     return t, solution
-    
-    def objective(self, params, x_start, y_start, x_target, y_target, time_span, dt=0.01):
-        initial_velocity, angle_degrees = params
-        angle = np.deg2rad(angle_degrees)
-        
-        x1, y1 = x_target, y_target
-
-        initial_state = [x_start, y_start,
-                        initial_velocity * np.cos(angle),
-                        initial_velocity * np.sin(angle)]
-        
-        t = np.arange(0, time_span, dt)
-
-        solution = odeint(self.derivatives, initial_state, t)
-
-        xT, yT = solution[-1][0], solution[-1][1]
-        return (xT - x1)**2 + (yT - y1)**2  # squared distance error
-
-
-    def find_objective(self, v0_guess, x_start, y_start, x_target, y_target, t):
-        result = minimize(self.objective,
-                        v0_guess,
-                        args=(x_start, y_start, x_target, y_target, t),
-                        method='SLSQP')
-        return result
-
-    def simulate(self, v0, angle_deg, start_x=0, start_y=0, t_max=2.0, dt=0.01):
-        angle = np.deg2rad(angle_deg)
-        initial_state = [start_x, start_y, v0 * np.cos(angle), v0 * np.sin(angle)]
-        t = np.arange(0, t_max, dt)
-        solution = odeint(self.derivatives, initial_state, t)
-        return t, solution
+from volleyball import Volleyball
+from target_window import HittingWindow
+import pandas as pd
 
 def get_encoded_image():
     # Load and encode the volleyball court image
@@ -219,11 +118,31 @@ app.layout = html.Div([
      State('time-input', 'value')]
 )
 def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
-    optimizer = ProjectileOptimizer()
+    optimizer = Volleyball(drag_coefficient = 0.48)
     result = optimizer.find_objective([10,40], x_start, y_start, x_target, y_target, time_max)
     initial_velocity, angle = result.x[0], result.x[1]
-    t, solution = optimizer.simulate(initial_velocity, angle, x_start, y_start, time_max)
+    t, solution = optimizer.simulate(initial_velocity, angle, np.array([x_start, y_start]), time_max)
     
+    hw = HittingWindow(np.array([x_target, y_target]))
+
+    df_sol = pd.DataFrame.from_dict(dict(zip(["x", "y", "dx", "dy"], solution.T)), orient='columns')
+    df_sol["time"] = t
+
+    df_sol_window = df_sol[df_sol.apply(hw.in_hitting_window, axis=1)]  # windshield wiper shape
+
+    if len(df_sol_window) > 0:
+        max_t = df_sol_window.loc[df_sol_window['time'].idxmax()]
+        min_t = df_sol_window.loc[df_sol_window['time'].idxmin()]
+        
+        if max_t is not None and min_t is not None:
+            print(max_t)
+            print(min_t)
+            time_in_window = max_t['time'] - min_t['time']
+            print(f"Time in window: {time_in_window:.4f}s")
+        else:
+            print("No valid window found")
+
+
     # Create main trajectory plot
     fig = go.Figure()
     
@@ -238,37 +157,6 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
         name='Trajectory',
         line=dict(color='red', width=3)
     ))
-
-    # fig.update_xaxes(autorange='reversed')
-    
-    # fig.add_layout_image(
-    #     dict(
-    #         source=get_encoded_image(),
-    #         xref="x",
-    #         yref="y",
-    #         x=16,      # Start at x=0
-    #         y=7,      # Adjust this value to match your image height
-    #         sizex=-16, # Width of the court in meters
-    #         sizey=10,  # Height of the image in meters
-    #         sizing="contain",
-    #         opacity=1,
-    #         layer="below")
-    # )
-
-    # Add time markers
-    # skip = len(t) // 10
-    # if skip < 1:
-    #     skip = 1
-        
-    # fig.add_trace(go.Scatter(
-    #     x=solution[::skip, 0],
-    #     y=solution[::skip, 1],
-    #     mode='markers+text',
-    #     name='Time Points',
-    #     text=[f't={t:.1f}s' for t in t[::skip]],
-    #     textposition="top center",
-    #     marker=dict(size=8, color='blue')
-    # ))
     
     # Update layout
     fig.update_layout(
@@ -305,6 +193,8 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
             opacity=1,
             layer="below")
     )
+
+    hw.create_hitting_window_figure(fig)
     
     # Calculate statistics
     max_height = np.max(solution[:, 1])
@@ -324,6 +214,8 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
         html.P(f"Instantaneous Velocity: {v_final:.2f} m/s"),
         html.P(f"Final vx: {vx_final:.2f} m/s"),
         html.P(f"Final vy: {vy_final:.2f} m/s"),
+        html.P(f"Time in window: {time_in_window:.4f}s"),
+        
     ])
     
     return fig, stats

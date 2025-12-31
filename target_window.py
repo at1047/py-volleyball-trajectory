@@ -1,5 +1,6 @@
 
 import numpy as np
+import plotly.graph_objects as go
 
 class HittingWindow:
     def __init__(self, target):
@@ -86,3 +87,67 @@ class HittingWindow:
         
         # Mark the wiper base
         ax.plot(wiper_base[0], wiper_base[1], 'bo', markersize=2, label='Wiper Base')
+
+    def create_hitting_window_figure(self, fig):
+        """
+        Returns a Plotly Figure object containing the windshield wiper hitting window
+        """
+        target = self.target
+        wiper_radius_outer = self.wiper_radius_outer
+        wiper_radius_inner = self.wiper_radius_inner
+        wiper_angle_degrees = self.wiper_angle_degrees
+        wiper_offset_top = self.wiper_offset_top
+        num_points = self.num_points=100
+
+        wiper_base = target - np.array([0, wiper_radius_outer - wiper_offset_top])
+        half_angle = wiper_angle_degrees / 2
+        
+        # Create angles for the wiper arc
+        angles = np.linspace(-half_angle, half_angle, num_points)
+        
+        # Outer arc
+        outer_x = wiper_base[0] + wiper_radius_outer * np.sin(np.radians(angles))
+        outer_y = wiper_base[1] + wiper_radius_outer * np.cos(np.radians(angles))
+        
+        # Inner arc
+        inner_x = wiper_base[0] + wiper_radius_inner * np.sin(np.radians(angles))
+        inner_y = wiper_base[1] + wiper_radius_inner * np.cos(np.radians(angles))
+        
+        # Create the wiper shape by connecting outer and inner arcs
+        wiper_x = np.concatenate([outer_x, inner_x[::-1]])
+        wiper_y = np.concatenate([outer_y, inner_y[::-1]])
+
+        # The Hitting Window (Filled Shape)
+        fig.add_trace(go.Scatter(
+            x=wiper_x, 
+            y=wiper_y,
+            fill='toself',   # This creates the filled polygon
+            fillcolor='rgba(255, 0, 0, 0.3)', # Red with 0.3 opacity
+            line=dict(color='red', width=1),
+            name='Hitting Window'
+        ))
+
+        # The Target Marker
+        fig.add_trace(go.Scatter(
+            x=[target[0]], 
+            y=[target[1]],
+            mode='markers',
+            marker=dict(color='red', size=8),
+            name='Target'
+        ))
+
+        # The Wiper Base Marker
+        fig.add_trace(go.Scatter(
+            x=[wiper_base[0]], 
+            y=[wiper_base[1]],
+            mode='markers',
+            marker=dict(color='blue', size=8),
+            name='Wiper Base'
+        ))
+
+        # Ensure aspect ratio is equal so the circle doesn't look oval
+        fig.update_layout(
+            yaxis_scaleanchor="x", 
+            yaxis_scaleratio=1,
+            showlegend=True
+        )
