@@ -18,18 +18,6 @@ class ProjectileMotion:
         self.air_density = air_density
         self.gravity = 9.81  # m/s²
         
-    def drag_force(self, velocity):
-        """Calculate drag force using F = 1/2 * ρ * v² * Cd * A"""
-        velocity_magnitude = np.linalg.norm(velocity)
-        if velocity_magnitude == 0:
-            return np.zeros_like(velocity)
-        
-        drag_magnitude = (0.5 * self.air_density * velocity_magnitude**2 * 
-                         self.drag_coefficient * self.area)
-        
-        # Drag force acts in opposite direction of velocity
-        return -drag_magnitude * velocity / velocity_magnitude
-    
     def derivatives(self, state, t):
         """Calculate derivatives for position and velocity"""
         # state = [x, y, vx, vy]
@@ -37,7 +25,14 @@ class ProjectileMotion:
         velocity = np.array([vx, vy])
         
         # Calculate drag force
-        drag_force = self.drag_force(velocity)
+        velocity_magnitude = np.linalg.norm(velocity)
+        if velocity_magnitude == 0:
+            return np.zeros_like(velocity)
+        
+        drag_magnitude = (0.5 * self.air_density * velocity_magnitude**2 * 
+                         self.drag_coefficient * self.area)
+        
+        drag_force = -drag_magnitude * velocity / velocity_magnitude
         
         # Acceleration components (F = ma)
         ax = drag_force[0] / self.mass
@@ -45,7 +40,7 @@ class ProjectileMotion:
         
         return [vx, vy, ax, ay]
     
-    def simulate(self, initial_velocity, angle_degrees, time_span, dt=0.001):
+    def simulate(self, initial_velocity, angle_degrees, initial_pos, time_span, dt=0.001):
         """
         Simulate projectile motion
         
@@ -55,29 +50,24 @@ class ProjectileMotion:
         - time_span: simulation duration in seconds
         - dt: time step in seconds
         """
-        # Convert angle to radians
         angle = np.deg2rad(angle_degrees)
-        
-        # Initial conditions [x, y, vx, vy]
-        initial_state = [0, 0,
+        initial_state = [initial_pos[0], initial_pos[1],
                         initial_velocity * np.cos(angle),
                         initial_velocity * np.sin(angle)]
         
-        # Time points
         t = np.arange(0, time_span, dt)
         
-        # Solve ODE
         solution = odeint(self.derivatives, initial_state, t)
         
         return t, solution
     
-    def objective(self, params, x_target, y_target, time_span, dt=0.01):
+    def objective(self, params, x_initial, y_initial, x_target, y_target, time_span, dt=0.01):
         initial_velocity, angle_degrees = params
         angle = np.deg2rad(angle_degrees)
         
         x1, y1 = x_target, y_target
 
-        initial_state = [0, 0,
+        initial_state = [x_initial, y_initial,
                         initial_velocity * np.cos(angle),
                         initial_velocity * np.sin(angle)]
         
@@ -89,62 +79,12 @@ class ProjectileMotion:
         return (xT - x1)**2 + (yT - y1)**2  # squared distance error
 
 
-    def find_objective(self, v0_guess, x_target, y_target, t):
+    def find_objective(self, v0_guess, x_initial, y_initial, x_target, y_target, t):
         result = minimize(self.objective,
                         v0_guess,
-                        args=(x_target, y_target, t),
+                        args=(x_initial, y_initial, x_target, y_target, t),
                         method='SLSQP')
         return result
-
-    def plot_trajectory(self, t, solution, show_velocity=True):
-        """Plot the trajectory and optionally show velocity vectors"""
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12))
-        # ax1 = plt.subplot()
-        
-        # Trajectory plot
-        ax1.plot(solution[:, 0], solution[:, 1], 'b*', label='Trajectory')
-        ax1.set_xlabel('Distance (m)')
-        ax1.set_ylabel('Height (m)')
-        ax1.set_title('Projectile Trajectory')
-        ax1.grid(True)
-        ax1.axis('equal')
-        ax1.set_xlim([-3,8])
-        ax1.set_xticks(range(-3, 8))
-        ax1.vlines([-2.5, 6.5], 0, 1)
-        ax1.hlines([0.2], 6, 6.5)
-        ax1.invert_xaxis()
-        img = plt.imread("Volleyball_Shoot_Processed.png")
-
-        img_height = 8
-        img_width = img_height*16/9
-
-        img_pos = [-5, -5.5]
-        print(img_width)
-
-        ax1.imshow(img, extent=[img_pos[0]+img_width, img_pos[0], img_pos[1], img_pos[1]+img_height], alpha=0.6)
-        
-        # if show_velocity:
-        #     # Plot velocity vectors at regular intervals
-        #     skip = len(t) // 20  # Show ~20 vectors
-        #     for i in range(0, len(t), skip):
-        #         ax1.quiver(solution[i, 0], solution[i, 1],
-        #                   solution[i, 2], solution[i, 3],
-        #                   angles='xy', scale_units='xy', scale=50,
-        #                   color='r', alpha=0.3)
-        
-        # Velocity components plot
-        ax2.plot(solution[:, 0], solution[:, 2], 'r-', label='Horizontal velocity')
-        ax2.plot(solution[:, 0], solution[:, 3], 'g-', label='Vertical velocity')
-        ax2.plot(solution[:, 0], (abs(solution[:, 2])**2 + abs(solution[:, 3])**2)**0.5, 'b-', label='ABS velocity')
-        ax2.set_xlabel('POS (s)')
-        ax2.set_ylabel('Velocity (m/s)')
-        ax2.set_title('Velocity Components')
-        ax2.grid(True)
-        ax2.legend()
-        
-        plt.tight_layout()
-        # return fig# , (ax1, ax2)
-        # return ax1
 
 
     def in_hitting_window(self, row, target):
@@ -159,48 +99,21 @@ class ProjectileMotion:
         """
 
         wiper_radius_outer = 1
-        wiper_radius_inner = 0.6
-        wiper_angle_degrees = 60
+        wiper_radius_inner = 0.8
+        wiper_angle_degrees = 30
         wiper_offset_top = 0.1
 
-        # wiper_base = target - np.array([0, wiper_radius_outer - wiper_radius_inner - wiper_offset_top])
         wiper_center = target - np.array([0, wiper_radius_outer - wiper_offset_top])
             
         x = row["x"]
         y = row["y"]
         pos = np.array([x, y])
         
-        # print(wiper_base)
-        # print(np.linalg.norm(pos - wiper_base))
-        # # Calculate distance from target
-        distance = np.linalg.norm(pos - wiper_center)
-
-        # # If too far, definitely not in window
-        # if distance > wiper_radius_outer:
-        #     return False
-            
-        # # If at the target, definitely in window
-        # if distance == 0:
-        #     return True
-            
-        # # Calculate angle from target to position
-        # # Vector from target to position
         direction_vector = pos - wiper_center
         print(f"direction_vector {direction_vector}")
 
-        
-        # # Calculate angle in radians (0° = straight up, positive = clockwise)
-        # print(type(direction_vector))
         angle_rad = np.arctan(abs(direction_vector[1]/direction_vector[0]))
         angle_degrees = abs(np.degrees(angle_rad)-90)
-        # print(f"angle_degrees {angle_degrees}")
-        
-        # # Normalize angle to [0, 360) range
-        # if angle_degrees < 0:
-        #     angle_degrees += 360
-            
-        # Check if angle is within the wiper range
-        # Wiper is centered around 0° (straight up) and extends ±wiper_angle_degrees/2
         half_angle = wiper_angle_degrees / 2
         print(f"half angle {half_angle}")
         print(f"angle_degrees {angle_degrees}")
@@ -208,7 +121,6 @@ class ProjectileMotion:
         print(f"{wiper_radius_inner} {wiper_radius_outer}")
         print(f"{wiper_radius_inner <= np.linalg.norm(pos - wiper_center) <= wiper_radius_outer}")
         
-        # return False
         return (abs(angle_degrees) <= half_angle and 
                 wiper_radius_inner <= np.linalg.norm(pos - wiper_center) <= wiper_radius_outer)
 
@@ -222,27 +134,22 @@ if __name__ == "__main__":
     # A = 0.0346
     # m = 0.27
 
-    time_span = 0.7 #1.08, 1.4
+    time_span = 0.7 # 1.08, 1.4
     time_past_span = 0.1
 
+    initial = np.array([0, 0])
     target = np.array([6.5, 0.3])
     hitting_radius = 0.1 # meters
 
-    result = proj.find_objective([10,40], target[0], target[1], time_span)
-    # print(result)
-    # print("end result")
+    result = proj.find_objective([10,40], initial[0], initial[1], target[0], target[1], time_span)
 
     initial_velocity, angle = result.x[0], result.x[1]
-    # Run simulation
-    t, solution = proj.simulate(initial_velocity, angle, time_span + time_past_span, dt = 0.0001)
+    # Run simulation to generate trajectory
+    t, solution = proj.simulate(initial_velocity, angle, initial, time_span + time_past_span, dt = 0.0001)
 
- 
-
-    # proj.plot_trajectory(t, solution, show_velocity=True)
-    fig, (ax1) = plt.subplots(1, 1) #, figsize=(15, 12)
-    # ax1 = plt.subplot()
     
     # Trajectory plot
+    fig, (ax1) = plt.subplots(1, 1)
     ax1.plot(solution[:, 0], solution[:, 1], 'b-', label='Trajectory')
     ax1.set_xlabel('Distance (m)')
     ax1.set_ylabel('Height (m)')
@@ -263,9 +170,10 @@ if __name__ == "__main__":
     
     df_sol = pd.DataFrame.from_dict(dict(zip(["x", "y", "dx", "dy"], solution.T)), orient='columns')
     df_sol["time"] = t
-    # print(df_sol)
-    # df_sol_window = df_sol[df_sol.apply(proj.in_hitting_window, axis=1, args=target)]
-    df_sol_window = df_sol[df_sol.apply(proj.in_hitting_window, axis=1, args=(target,))]  # windshield wiper shape
+
+    window_target = target - np.array([0.2, 0])
+
+    df_sol_window = df_sol[df_sol.apply(proj.in_hitting_window, axis=1, args=(window_target,))]  # windshield wiper shape
     print(f"Points in wiper window: {len(df_sol_window)}")
     print(f"Total trajectory points: {len(df_sol)}")
 
@@ -284,8 +192,8 @@ if __name__ == "__main__":
     ax1.imshow(img, extent=[img_pos[0]+img_width, img_pos[0], img_pos[1], img_pos[1]+img_height], alpha=0.6)
     
     # Draw the hitting window (windshield wiper shape)
-    def draw_hitting_window(ax, target, wiper_radius_outer=1, wiper_radius_inner=0.6, 
-                           wiper_angle_degrees=60, wiper_offset_top=0.1, num_points=100):
+    def draw_hitting_window(ax, target, wiper_radius_outer=1, wiper_radius_inner=0.8, 
+                           wiper_angle_degrees=30, wiper_offset_top=0.1, num_points=100):
         """Draw the windshield wiper hitting window"""
         wiper_base = target - np.array([0, wiper_radius_outer - wiper_offset_top])
         half_angle = wiper_angle_degrees / 2
@@ -316,7 +224,7 @@ if __name__ == "__main__":
         ax.plot(wiper_base[0], wiper_base[1], 'bo', markersize=2, label='Wiper Base')
     
     # Draw the hitting window
-    draw_hitting_window(ax1, target)
+    draw_hitting_window(ax1, window_target)
     ax1.legend()
 
     plt.show()
