@@ -1,0 +1,8 @@
+dash
+plotly
+numpy
+scipy
+pillow
+ultralytics
+torch
+torchvision
