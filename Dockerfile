@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code and image
 COPY app.py /app/
+COPY volleyball.py /app/
+COPY target_window.py /app/
 COPY Volleyball_Shoot_Processed.png /app/
 
 # Expose port (default Dash port)

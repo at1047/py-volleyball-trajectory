@@ -25,7 +25,7 @@ app = dash.Dash(__name__)
 # Create the layout
 app.layout = html.Div([
     html.H1("Volleyball Trajectory Simulator", 
-            style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': 30}),
+            style={'textAlign': 'center', 'color': '#000000', 'marginBottom': 30}),
     
     html.Div([
         html.Div([
@@ -93,7 +93,7 @@ app.layout = html.Div([
         ], style={
             'width': '15%',
             'padding': 8,
-            'backgroundColor': '#f8f9fa',
+            'backgroundColor': '#ffffff',
             'borderRadius': '10px',
             'minWidth': '120px',
             'maxWidth': '180px'
@@ -121,7 +121,7 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
     optimizer = Volleyball(drag_coefficient = 0.48)
     result = optimizer.find_objective([10,40], x_start, y_start, x_target, y_target, time_max)
     initial_velocity, angle = result.x[0], result.x[1]
-    t, solution = optimizer.simulate(initial_velocity, angle, np.array([x_start, y_start]), time_max)
+    t, solution = optimizer.simulate(initial_velocity, angle, np.array([x_start, y_start]), time_max + 0.1)
     
     hw = HittingWindow(np.array([x_target, y_target]))
 
@@ -155,7 +155,7 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
         y=solution[:, 1],
         mode='lines',
         name='Trajectory',
-        line=dict(color='red', width=3)
+        line=dict(color='red', width=2)
     ))
     
     # Update layout
@@ -196,12 +196,12 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
 
     hw.create_hitting_window_figure(fig)
     
-    # Calculate statistics
-    max_height = np.max(solution[:, 1])
-    max_distance = np.max(solution[:, 0])
-    impact_idx = np.where(solution[:, 1] <= 0)[0]
-    impact_time = t[impact_idx[0]] if len(impact_idx) > 0 else time_max
-    impact_distance = solution[impact_idx[0], 0] if len(impact_idx) > 0 else max_distance
+    # # Calculate statistics
+    # max_height = np.max(solution[:, 1])
+    # max_distance = np.max(solution[:, 0])
+    # impact_idx = np.where(solution[:, 1] <= 0)[0]
+    # impact_time = t[impact_idx[0]] if len(impact_idx) > 0 else time_max
+    # impact_distance = solution[impact_idx[0], 0] if len(impact_idx) > 0 else max_distance
 
     # Final velocity at last point
     vx_final = solution[-1, 2]
@@ -209,8 +209,8 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
     v_final = np.sqrt(vx_final**2 + vy_final**2)
 
     stats = html.Div([
-        html.P(f"Maximum Height: {max_height:.2f} m"),
-        html.P(f"Maximum Distance: {max_distance:.2f} m"),
+        # html.P(f"Maximum Height: {max_height:.2f} m"),
+        # html.P(f"Maximum Distance: {max_distance:.2f} m"),
         html.P(f"Instantaneous Velocity: {v_final:.2f} m/s"),
         html.P(f"Final vx: {vx_final:.2f} m/s"),
         html.P(f"Final vy: {vy_final:.2f} m/s"),
@@ -222,4 +222,4 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
 
 if __name__ == '__main__':
     # app.run(debug=False, host='0.0.0.0', port=8050)
-    app.run(debug=True, port=8050)
+    app.run(debug=True, host='0.0.0.0', port=8050)

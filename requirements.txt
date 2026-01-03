@@ -1,8 +1,6 @@
 dash
 plotly
+pandas
 numpy
 scipy
 pillow
-ultralytics
-torch
-torchvision
