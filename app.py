@@ -22,6 +22,7 @@ def get_encoded_image():
 # Initialize the Dash app
 app = dash.Dash(__name__)
 
+server = app.server
 # Create the layout
 app.layout = html.Div([
     html.H1("Volleyball Trajectory Simulator", 
@@ -222,4 +223,7 @@ def update_trajectory(n_clicks, x_start, y_start, x_target, y_target, time_max):
 
 if __name__ == '__main__':
     # app.run(debug=False, host='0.0.0.0', port=8050)
-    app.run(debug=True, host='0.0.0.0', port=8050)
+    app.run(debug=False, host='0.0.0.0', port=8050)
+    server = app.server
+
+
