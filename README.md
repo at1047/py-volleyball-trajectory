@@ -6,7 +6,19 @@ The simulator solves an inverse trajectory problem to compute feasible launch pa
 
 
 
-To build:
+To build docker:
 ```
 docker buildx build --platform linux/amd64,linux/arm64 --push -t at1047/volleyball-trajectory 
+```
+
+
+To install new libraries (ran out of space on my server for docker):
+```
+cd /var/www/py-volleyball-trajectory
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install with low-memory flag (Prevents "Killed" error)
+pip install -r requirements.txt --no-cache-dir
 ```

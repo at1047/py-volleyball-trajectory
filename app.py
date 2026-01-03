@@ -52,7 +52,7 @@ app.layout = html.Div([
             dcc.Input(
                 id='target-x',
                 type='number',
-                value=6.5,
+                value=6.3,
                 step=0.1,
                 style={'marginBottom': '6px', 'width': '100%', 'fontSize': '12px', 'padding': '2px'}
             ),
@@ -70,7 +70,7 @@ app.layout = html.Div([
             dcc.Input(
                 id='time-input',
                 type='number',
-                value=1.6,
+                value=0.7,
                 step=0.1,
                 style={'marginBottom': '6px', 'width': '100%', 'fontSize': '12px', 'padding': '2px'}
             ),
